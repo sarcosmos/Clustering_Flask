@@ -15,6 +15,7 @@
             <!-- <a href="{{ url_for('resultadosSpark') }}">Ventas Spark</a> -->
             <a href="#problema">Problema</a>
             <a href="#modelo">Modelo</a>
+            <a href="#metricas">Metricas</a>
             <a href="#graficas">Graficas</a>
             <a href="#resultados">Resultados</a>
         </div>
@@ -28,6 +29,19 @@
             {{ data.clientes_mostrados }} registros para mantener la pagina ligera.
         </p>
     </header>
+
+    <section id="metricas" class="dashboard-section">
+        <h2>Metricas rapidas del analisis</h2>
+        <div class="metric-grid">
+            {% for metrica in data.metricas %}
+            <article class="metric-card">
+                <span>{{ metrica.titulo }}</span>
+                <strong>{{ metrica.valor }}</strong>
+                <small>{{ metrica.detalle }}</small>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
 
     <section id="problema">
         <h2>Descripcion del problema</h2>
@@ -96,6 +110,57 @@
         </p>
     </section>
 
+    <section id="silhouette">
+        <h2>Silhouette Score</h2>
+        <div class="silhouette-layout">
+            <article class="silhouette-card {{ data.silhouette.clase }}">
+                <span>Calidad de separacion</span>
+                <strong>{{ data.silhouette.valor }}</strong>
+                <em>{{ data.silhouette.nivel }}</em>
+                <p>{{ data.silhouette.mensaje }}</p>
+            </article>
+            <div>
+                <p>
+                    El Silhouette Score mide que tan parecido es un cliente a los clientes de su propio
+                    cluster frente a los clientes de otros clusters. Su valor va aproximadamente de -1 a 1:
+                    mientras mas alto sea, mejor separados estan los grupos.
+                </p>
+                <p>
+                    Es importante porque ayuda a validar si K-Means encontro segmentos coherentes y no solo
+                    divisiones numericas. En negocio, una mejor separacion facilita disenar estrategias
+                    distintas para retencion, fidelizacion o venta cruzada.
+                </p>
+                <div class="score-scale">
+                    <span>Malo</span>
+                    <span>Aceptable</span>
+                    <span>Bueno</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="scaler">
+        <h2>Por que se usa StandardScaler</h2>
+        <div class="grid">
+            <div class="card">
+                <h3>Escalas comparables</h3>
+                <p>Variables como TotalCharges pueden tener miles de unidades, mientras SeniorCitizen solo vale 0 o 1.</p>
+            </div>
+            <div class="card">
+                <h3>Distancias justas</h3>
+                <p>K-Means agrupa por distancia. Si no se escalan los datos, las columnas grandes dominan el calculo.</p>
+            </div>
+            <div class="card">
+                <h3>Mejores centroides</h3>
+                <p>Al estandarizar, cada variable aporta de forma mas equilibrada al perfil promedio del cluster.</p>
+            </div>
+            <div class="card">
+                <h3>Sin escalado</h3>
+                <p>El modelo podria separar clientes casi solo por cargos monetarios e ignorar contrato, servicios o antiguedad.</p>
+            </div>
+        </div>
+    </section>
+
     <section id="graficas">
         <h2>Visualizacion de los clusteres</h2>
         <p class="nota">
@@ -122,6 +187,35 @@
             Varianza explicada por PCA: componente 1 = {{ data.grafica_clusters.varianza[0] }}%,
             componente 2 = {{ data.grafica_clusters.varianza[1] }}%.
         </p>
+    </section>
+
+    <section id="graficas-negocio">
+        <h2>Graficas de negocio por cluster</h2>
+        <p>
+            Estas visualizaciones comparan abandono, tamano, antiguedad y gasto promedio por cluster.
+            Permiten priorizar acciones comerciales sin revisar toda la tabla de clientes.
+        </p>
+        <div class="chart-grid">
+            {% for grafica in [
+                data.graficas_negocio.churn,
+                data.graficas_negocio.tamano,
+                data.graficas_negocio.antiguedad,
+                data.graficas_negocio.cargos
+            ] %}
+            <article class="bar-chart">
+                <h3>{{ grafica.titulo }}</h3>
+                {% for barra in grafica.barras %}
+                <div class="bar-row">
+                    <span>C{{ barra.cluster }}</span>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: {{ barra.ancho }}%; background: {{ barra.color }}"></div>
+                    </div>
+                    <strong>{{ barra.etiqueta }}</strong>
+                </div>
+                {% endfor %}
+            </article>
+            {% endfor %}
+        </div>
     </section>
 
     <section id="centroides">
@@ -181,11 +275,25 @@
             puede necesitar acciones de retencion; uno con mayor antiguedad y cargos altos puede
             representar clientes valiosos y estables.
         </p>
-        <ul>
+        <div class="cluster-grid">
             {% for item in data.interpretacion %}
-                <li>{{ item.texto }}</li>
+            <article class="cluster-card">
+                <span>Cluster {{ item.cluster }}</span>
+                <h3>{{ item.perfil }}</h3>
+                <p>{{ item.comportamiento }}</p>
+                <dl>
+                    <dt>Riesgo</dt>
+                    <dd>{{ item.riesgo }}</dd>
+                    <dt>Estabilidad</dt>
+                    <dd>{{ item.estabilidad }}</dd>
+                    <dt>Gasto</dt>
+                    <dd>{{ item.gasto }}</dd>
+                    <dt>Estrategia</dt>
+                    <dd>{{ item.estrategia }}</dd>
+                </dl>
+            </article>
             {% endfor %}
-        </ul>
+        </div>
     </section>
 
     <section id="variables">
@@ -262,6 +370,50 @@
             </tr>
             {% endfor %}
         </table>
+    </section>
+
+    <section id="limitaciones">
+        <h2>Limitaciones de K-Means</h2>
+        <div class="grid">
+            <div class="card">
+                <h3>Depende del valor K</h3>
+                <p>Elegir pocos o muchos clusters cambia la lectura del negocio. El metodo del codo ayuda, pero no decide solo.</p>
+            </div>
+            <div class="card">
+                <h3>Sensible a outliers</h3>
+                <p>Clientes con cargos o comportamientos extremos pueden mover centroides y afectar la segmentacion.</p>
+            </div>
+            <div class="card">
+                <h3>Separacion imperfecta</h3>
+                <p>Algunos grupos pueden solaparse, especialmente cuando los clientes tienen comportamientos mixtos.</p>
+            </div>
+            <div class="card">
+                <h3>PCA es una aproximacion</h3>
+                <p>La grafica reduce muchas variables a dos dimensiones, por eso no muestra toda la complejidad del modelo.</p>
+            </div>
+            <div class="card">
+                <h3>Variables seleccionadas</h3>
+                <p>Los clusters dependen de las columnas usadas. Si se agregan nuevas variables, los perfiles pueden cambiar.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="conclusiones">
+        <h2>Conclusiones de negocio</h2>
+        <div class="conclusion-panel">
+            <p>
+                Los clusters con mayor churn deben priorizarse para retencion, especialmente si tambien tienen
+                cargos mensuales altos. Perder esos clientes afecta tanto la base como los ingresos recurrentes.
+            </p>
+            <p>
+                Los clusters de mayor antiguedad y menor churn representan clientes fidelizados. En una empresa
+                real, estos segmentos pueden recibir programas de lealtad, venta cruzada y beneficios por permanencia.
+            </p>
+            <p>
+                Los clientes nuevos o de bajo valor requieren estrategias diferentes: onboarding claro, soporte
+                temprano y ofertas controladas para aumentar uso sin elevar demasiado el costo comercial.
+            </p>
+        </div>
     </section>
 
 </body>

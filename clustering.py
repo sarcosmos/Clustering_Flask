@@ -10,6 +10,7 @@ os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.feature_extraction import DictVectorizer
+from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
 
@@ -191,19 +192,25 @@ def RealizarClustering(n_clusters=5):
     # n_init=10 prueba varios puntos iniciales para buscar clusters mas estables.
     modelo = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
     etiquetas = modelo.fit_predict(variables_escaladas)
+    silhouette = CrearSilhouetteScore(variables_escaladas, etiquetas)
 
     # Se agrega la etiqueta de cluster a cada fila original para poder mostrarla
     # junto con los datos interpretables del cliente.
     for fila, etiqueta in zip(datos, etiquetas):
         fila["cluster"] = int(etiqueta)
 
+    resumen_cluster = CrearResumen(datos)
+
     return {
         "resultado": datos[:25],
-        "resumen_cluster": CrearResumen(datos),
+        "resumen_cluster": resumen_cluster,
         "centroides": CrearCentroides(datos),
         "grafica_clusters": CrearGraficaClusters(datos, variables_escaladas, modelo),
         "grafica_codo": CrearGraficaCodo(variables_escaladas),
+        "graficas_negocio": CrearGraficasNegocio(resumen_cluster),
         "interpretacion": CrearInterpretacion(datos),
+        "metricas": CrearMetricasRapidas(datos, resumen_cluster, n_clusters),
+        "silhouette": silhouette,
         "columnas_modelo": columnas_modelo,
         "variables_usadas": VARIABLES_USADAS,
         "total_clientes": len(datos),
@@ -250,11 +257,90 @@ def CrearResumen(datos):
             "antiguedad_promedio": round(grupo["antiguedad_total"] / clientes, 2),
             "cargo_mensual_promedio": round(grupo["cargo_mensual_total"] / clientes, 2),
             "cargo_total_promedio": round(grupo["cargo_total_total"] / clientes, 2),
-            "churn_si": grupo["churn_si"],
-            "churn_no": grupo["churn_no"],
-        })
+                "churn_si": grupo["churn_si"],
+                "churn_no": grupo["churn_no"],
+                "churn_porcentaje": round(grupo["churn_si"] * 100 / clientes, 2),
+            })
 
     return sorted(resultado, key=lambda grupo: grupo["cluster"])
+
+
+def CrearSilhouetteScore(variables_escaladas, etiquetas):
+    """Calcula y clasifica el Silhouette Score del agrupamiento."""
+    valor = float(silhouette_score(variables_escaladas, etiquetas))
+
+    if valor < 0.25:
+        nivel = "Malo"
+        clase = "malo"
+        mensaje = "Los grupos tienen separacion debil y pueden mezclarse entre si."
+    elif valor < 0.50:
+        nivel = "Aceptable"
+        clase = "aceptable"
+        mensaje = "Los grupos muestran una separacion util, aunque todavia hay solapamientos."
+    else:
+        nivel = "Bueno"
+        clase = "bueno"
+        mensaje = "Los grupos estan bien separados y son mas faciles de interpretar."
+
+    return {
+        "valor": round(valor, 3),
+        "nivel": nivel,
+        "clase": clase,
+        "mensaje": mensaje,
+    }
+
+
+def CrearMetricasRapidas(datos, resumen, n_clusters):
+    """Construye indicadores ejecutivos para la parte superior del dashboard."""
+    total_clientes = len(datos)
+    churn_promedio = sum(1 for fila in datos if fila["Churn"] == "Yes") * 100 / total_clientes
+    cargo_mensual_promedio = sum(fila["MonthlyCharges"] for fila in datos) / total_clientes
+    mayor_churn = max(resumen, key=lambda grupo: grupo["churn_porcentaje"])
+    mas_estable = min(resumen, key=lambda grupo: grupo["churn_porcentaje"])
+
+    return [
+        {"titulo": "Total clientes", "valor": f"{total_clientes:,}", "detalle": "Registros analizados"},
+        {"titulo": "Clusters", "valor": n_clusters, "detalle": "Segmentos K-Means"},
+        {"titulo": "Churn promedio", "valor": f"{churn_promedio:.1f}%", "detalle": "Base completa"},
+        {"titulo": "Mayor churn", "valor": f"C{mayor_churn['cluster']}", "detalle": f"{mayor_churn['churn_porcentaje']:.1f}% de abandono"},
+        {"titulo": "Mas estable", "valor": f"C{mas_estable['cluster']}", "detalle": f"{mas_estable['churn_porcentaje']:.1f}% de abandono"},
+        {"titulo": "Cargo mensual", "valor": f"${cargo_mensual_promedio:,.0f}", "detalle": "Promedio general"},
+    ]
+
+
+def CrearGraficasNegocio(resumen):
+    """Prepara barras SVG para las visualizaciones por cluster."""
+    return {
+        "churn": CrearBarras(resumen, "churn_porcentaje", "%", "Churn por cluster"),
+        "tamano": CrearBarras(resumen, "clientes", "", "Clientes por cluster"),
+        "antiguedad": CrearBarras(resumen, "antiguedad_promedio", " meses", "Antiguedad promedio"),
+        "cargos": CrearBarras(resumen, "cargo_mensual_promedio", "", "Cargo mensual promedio", moneda=True),
+    }
+
+
+def CrearBarras(resumen, campo, sufijo, titulo, moneda=False):
+    """Escala valores de resumen a una grafica de barras horizontal en SVG."""
+    maximo = max(grupo[campo] for grupo in resumen) or 1
+    barras = []
+
+    for indice, grupo in enumerate(resumen):
+        valor = grupo[campo]
+        if moneda:
+            etiqueta = f"${valor:,.0f}"
+        elif isinstance(valor, float):
+            etiqueta = f"{valor:.1f}{sufijo}"
+        else:
+            etiqueta = f"{valor}{sufijo}"
+
+        barras.append({
+            "cluster": grupo["cluster"],
+            "valor": valor,
+            "etiqueta": etiqueta,
+            "ancho": round((valor / maximo) * 100, 2),
+            "color": COLORES_CLUSTER[indice % len(COLORES_CLUSTER)],
+        })
+
+    return {"titulo": titulo, "barras": barras}
 
 
 def CrearCentroides(datos):
@@ -371,7 +457,7 @@ def CrearGraficaCodo(variables_escaladas):
 
 
 def CrearInterpretacion(datos):
-    """Genera frases simples comparando cada cluster contra el promedio general."""
+    """Genera lectura de negocio comparando cada cluster contra el promedio general."""
     resumen = CrearResumen(datos)
     promedio_tenure = sum(fila["tenure"] for fila in datos) / len(datos)
     promedio_mensual = sum(fila["MonthlyCharges"] for fila in datos) / len(datos)
@@ -383,16 +469,77 @@ def CrearInterpretacion(datos):
         antiguedad = DescribirNivel(grupo["antiguedad_promedio"], promedio_tenure)
         cargo = DescribirNivel(grupo["cargo_mensual_promedio"], promedio_mensual)
         churn = DescribirNivel(churn_grupo, churn_total)
+        perfil = ClasificarPerfil(antiguedad, cargo, churn)
         interpretaciones.append({
             "cluster": grupo["cluster"],
-            "texto": (
-                f"Cluster {grupo['cluster']}: agrupa {grupo['clientes']} clientes. "
-                f"Tiene antiguedad {antiguedad}, cargo mensual {cargo} y abandono {churn} "
-                f"frente al promedio general."
+            "perfil": perfil["perfil"],
+            "comportamiento": (
+                f"Agrupa {grupo['clientes']} clientes con antiguedad {antiguedad}, "
+                f"cargo mensual {cargo} y churn {churn} frente al promedio general."
             ),
+            "riesgo": perfil["riesgo"],
+            "estabilidad": perfil["estabilidad"],
+            "gasto": perfil["gasto"],
+            "estrategia": perfil["estrategia"],
         })
 
     return interpretaciones
+
+
+def ClasificarPerfil(antiguedad, cargo, churn):
+    """Traduce patrones numericos a perfiles de negocio accionables."""
+    if churn == "alto" and cargo == "alto":
+        return {
+            "perfil": "Clientes premium en riesgo",
+            "riesgo": "Alto: combinan buen ingreso mensual con probabilidad elevada de abandono.",
+            "estabilidad": "Requieren seguimiento cercano porque su permanencia no esta consolidada.",
+            "gasto": "Alto valor recurrente para la empresa.",
+            "estrategia": "Priorizar retencion, beneficios personalizados y revision de experiencia de servicio.",
+        }
+
+    if churn == "alto":
+        return {
+            "perfil": "Clientes con alto riesgo",
+            "riesgo": "Alto: el abandono supera el comportamiento promedio de la base.",
+            "estabilidad": "Baja o media, segun su antiguedad dentro del servicio.",
+            "gasto": f"Nivel de gasto {cargo}; conviene medir rentabilidad antes de incentivar.",
+            "estrategia": "Aplicar campanas de recuperacion, soporte proactivo y ofertas de permanencia.",
+        }
+
+    if antiguedad == "alto" and churn == "bajo":
+        return {
+            "perfil": "Clientes fidelizados",
+            "riesgo": "Bajo: muestran permanencia y menor tendencia de abandono.",
+            "estabilidad": "Alta; son una base adecuada para programas de lealtad.",
+            "gasto": f"Nivel de gasto {cargo}, con oportunidad de venta cruzada si el valor es medio o bajo.",
+            "estrategia": "Mantener satisfaccion, ofrecer upgrades graduales y reconocer la antiguedad.",
+        }
+
+    if cargo == "alto":
+        return {
+            "perfil": "Clientes rentables",
+            "riesgo": f"Riesgo {churn}; deben monitorearse por su impacto en ingresos.",
+            "estabilidad": f"Antiguedad {antiguedad}, lo que define el tipo de acompanamiento.",
+            "gasto": "Alto; aportan ingresos mensuales superiores al promedio.",
+            "estrategia": "Cuidar experiencia, soporte y bundles para proteger el valor del segmento.",
+        }
+
+    if antiguedad == "bajo":
+        return {
+            "perfil": "Clientes nuevos",
+            "riesgo": f"Riesgo {churn}; estan en una etapa temprana de relacion.",
+            "estabilidad": "Todavia en formacion, sensibles a problemas iniciales de servicio.",
+            "gasto": f"Nivel de gasto {cargo}.",
+            "estrategia": "Mejorar onboarding, educacion del producto y contactos tempranos de satisfaccion.",
+        }
+
+    return {
+        "perfil": "Clientes de bajo valor o comportamiento medio",
+        "riesgo": f"Riesgo {churn}; no son el segmento mas critico pero conviene observar tendencias.",
+        "estabilidad": f"Antiguedad {antiguedad}, con margen para fortalecer la relacion.",
+        "gasto": f"Nivel de gasto {cargo}.",
+        "estrategia": "Usar ofertas segmentadas de bajo costo y evaluar oportunidades de upgrade.",
+    }
 
 
 def DescribirNivel(valor, promedio):
