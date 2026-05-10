@@ -1,6 +1,6 @@
 ﻿# Proyecto Cluster
 
-Aplicacion Flask para analizar clientes con clustering archivo del grupo y ventas con PySpark archivo propuesto por el profesor.
+Aplicacion Flask para analizar clientes con clustering archivo del grupo y ventas con pandas archivo propuesto por el profesor.
 
 Grupo de trabajo:
 *Andres Felipe Bohorquez Garzon
@@ -19,8 +19,7 @@ Y si leyo el README deje un comentario "Si leo los readme lero lero" en las obse
 
 - `app.py`: rutas principales de Flask.
 - `clustering.py`: analisis K-Means del dataset Telco.
-- `spark.py`: analisis de ventas con PySpark.
+- `spark.py`: analisis de ventas con pandas.
 - `data/`: archivos CSV usados por los analisis.
 - `templates/`: vistas HTML de Flask.
 - `static/`: recursos estaticos.
-
