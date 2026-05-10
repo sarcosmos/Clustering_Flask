@@ -7,7 +7,7 @@ app = Flask(__name__)
 @app.route('/')
 def home():
     info = clustering.RealizarClustering()
-    return render_template("Cluster.html", data=info)
+    return render_template("index.html", data=info)
 
 @app.route("/spark/")
 def resultadosSpark():
