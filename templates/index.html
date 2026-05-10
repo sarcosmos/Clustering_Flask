@@ -74,23 +74,29 @@
     </section>
 
     <section id="conceptos">
-        <h2>Conceptos principales de K-Means</h2>
+        <h2>Por que usamos K-Means y PCA</h2>
+        <p>
+            En este proyecto <strong>K-Means es el algoritmo principal</strong>: es el modelo que
+            agrupa a los clientes en clusters segun su similitud. <strong>PCA no crea los clusters</strong>;
+            se usa despues para reducir muchas variables a dos dimensiones y poder mostrar el resultado
+            en una grafica entendible.
+        </p>
         <div class="grid">
+            <div class="card">
+                <h3>K-Means</h3>
+                <p>Se usa porque permite segmentar clientes sin una etiqueta previa, encontrando grupos parecidos por antiguedad, cargos, contrato y servicios.</p>
+            </div>
             <div class="card">
                 <h3>Cluster</h3>
                 <p>Grupo de clientes que son parecidos entre si segun las variables usadas.</p>
             </div>
             <div class="card">
-                <h3>Centroide</h3>
-                <p>Punto central de un cluster. Representa el perfil promedio del grupo.</p>
+                <h3>Centroide y distancia</h3>
+                <p>K-Means calcula un centroide para cada grupo y asigna cada cliente al centroide mas cercano.</p>
             </div>
             <div class="card">
-                <h3>Distancia</h3>
-                <p>K-Means asigna cada cliente al centroide mas cercano.</p>
-            </div>
-            <div class="card">
-                <h3>Inercia</h3>
-                <p>Suma de distancias internas. Mientras menor sea, mas compactos son los clusters.</p>
+                <h3>PCA</h3>
+                <p>PCA significa Analisis de Componentes Principales. Resume muchas columnas en dos ejes que conservan la mayor variacion posible para visualizar los clusters.</p>
             </div>
         </div>
     </section>
@@ -106,7 +112,8 @@
         </ol>
         <p class="nota">
             Despues de convertir categorias a variables numericas, el modelo utiliza
-            {{ data.columnas_modelo|length }} columnas.
+            {{ data.columnas_modelo|length }} columnas. K-Means trabaja con todas esas columnas
+            escaladas; PCA solo se aplica al final para dibujar una version en dos dimensiones.
         </p>
     </section>
 
@@ -164,9 +171,11 @@
     <section id="graficas">
         <h2>Visualizacion de los clusteres</h2>
         <p class="nota">
-            La grafica proyecta las variables del modelo a dos dimensiones usando PCA.
-            Cada punto representa un cliente de una muestra del dataset y cada color representa un cluster.
-            Los cuadros grandes representan los centroides proyectados.
+            La grafica proyecta las variables del modelo a dos dimensiones usando PCA. Esto es necesario
+            porque el modelo trabaja con muchas columnas y no seria posible dibujarlas todas en una grafica
+            plana. Cada punto representa un cliente de una muestra del dataset y cada color representa el
+            cluster asignado previamente por K-Means. Los cuadros grandes representan los centroides
+            proyectados.
         </p>
 
         <svg class="grafica" viewBox="0 0 800 420" role="img" aria-label="Grafica de clusters">
