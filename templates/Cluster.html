@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clustering de Clientes</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar" aria-label="Navegacion principal">
+        <a class="brand" href="{{ url_for('home') }}">Proyecto Mineria</a>
+        <div class="nav-links">
+            <a href="{{ url_for('home') }}">Clustering</a>
+            <!-- <a href="{{ url_for('resultadosSpark') }}">Ventas Spark</a> -->
+            <a href="#problema">Problema</a>
+            <a href="#modelo">Modelo</a>
+            <a href="#graficas">Graficas</a>
+            <a href="#resultados">Resultados</a>
+        </div>
+    </nav>
+
+    <header id="inicio">
+        <h1>Clustering de Clientes con K-Means</h1>
+        <p>
+            Se agruparon {{ data.total_clientes }} clientes del dataset Telco Customer Churn
+            en {{ data.n_clusters }} clusters. La tabla de clientes muestra solo los primeros
+            {{ data.clientes_mostrados }} registros para mantener la pagina ligera.
+        </p>
+    </header>
+
+    <section id="problema">
+        <h2>Descripcion del problema</h2>
+        <p>
+            El problema consiste en encontrar grupos de clientes con comportamientos similares
+            sin usar una etiqueta previa. En lugar de predecir directamente si un cliente hara
+            churn, el objetivo es segmentar la base de clientes para entender perfiles de uso,
+            gasto, antiguedad y tipo de contrato.
+        </p>
+        <p>
+            Esta segmentacion puede ayudar a identificar clientes nuevos de alto riesgo,
+            clientes estables, clientes con servicios premium y grupos que requieren estrategias
+            comerciales diferentes.
+        </p>
+    </section>
+
+    <section id="dataset">
+        <h2>Explicacion del dataset</h2>
+        <p>
+            El archivo utilizado es <strong>WA_Fn-UseC_-Telco-Customer-Churn.csv</strong>.
+            Contiene informacion de clientes de una empresa de telecomunicaciones, incluyendo
+            datos demograficos, servicios contratados, tipo de contrato, metodo de pago,
+            cargos mensuales, cargos totales y la variable <strong>Churn</strong>.
+        </p>
+        <p>
+            Para el agrupamiento se excluyeron <strong>customerID</strong>, porque solo identifica
+            al cliente, y <strong>Churn</strong>, porque es una etiqueta de resultado. Churn se
+            conserva despues para interpretar que tan riesgoso es cada cluster.
+        </p>
+    </section>
+
+    <section id="conceptos">
+        <h2>Conceptos principales de K-Means</h2>
+        <div class="grid">
+            <div class="card">
+                <h3>Cluster</h3>
+                <p>Grupo de clientes que son parecidos entre si segun las variables usadas.</p>
+            </div>
+            <div class="card">
+                <h3>Centroide</h3>
+                <p>Punto central de un cluster. Representa el perfil promedio del grupo.</p>
+            </div>
+            <div class="card">
+                <h3>Distancia</h3>
+                <p>K-Means asigna cada cliente al centroide mas cercano.</p>
+            </div>
+            <div class="card">
+                <h3>Inercia</h3>
+                <p>Suma de distancias internas. Mientras menor sea, mas compactos son los clusters.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="modelo">
+        <h2>Ejecucion del modelo</h2>
+        <ol>
+            <li>Se lee el CSV desde la carpeta <strong>data</strong>.</li>
+            <li>Se convierte <strong>TotalCharges</strong> a numero y se completan valores vacios con la mediana.</li>
+            <li>Las variables categoricas se convierten a columnas numericas con codificacion one-hot.</li>
+            <li>Las variables se escalan con <strong>StandardScaler</strong> para que ninguna domine por su magnitud.</li>
+            <li>Se ejecuta <strong>KMeans</strong> con {{ data.n_clusters }} clusters, <strong>random_state=42</strong> y <strong>n_init=10</strong>.</li>
+        </ol>
+        <p class="nota">
+            Despues de convertir categorias a variables numericas, el modelo utiliza
+            {{ data.columnas_modelo|length }} columnas.
+        </p>
+    </section>
+
+    <section id="graficas">
+        <h2>Visualizacion de los clusteres</h2>
+        <p class="nota">
+            La grafica proyecta las variables del modelo a dos dimensiones usando PCA.
+            Cada punto representa un cliente de una muestra del dataset y cada color representa un cluster.
+            Los cuadros grandes representan los centroides proyectados.
+        </p>
+
+        <svg class="grafica" viewBox="0 0 800 420" role="img" aria-label="Grafica de clusters">
+            <line x1="40" y1="380" x2="780" y2="380" stroke="#9ca3af" />
+            <line x1="40" y1="20" x2="40" y2="380" stroke="#9ca3af" />
+
+            {% for punto in data.grafica_clusters.puntos %}
+                <circle cx="{{ punto.svg_x }}" cy="{{ punto.svg_y }}" r="3" fill="{{ punto.color }}" opacity="0.55" />
+            {% endfor %}
+
+            {% for centroide in data.grafica_clusters.centroides %}
+                <rect x="{{ centroide.svg_x - 7 }}" y="{{ centroide.svg_y - 7 }}" width="14" height="14" fill="{{ centroide.color }}" stroke="#111827" />
+                <text x="{{ centroide.svg_x + 10 }}" y="{{ centroide.svg_y - 10 }}" font-size="13" fill="#111827">C{{ centroide.cluster }}</text>
+            {% endfor %}
+        </svg>
+
+        <p class="nota">
+            Varianza explicada por PCA: componente 1 = {{ data.grafica_clusters.varianza[0] }}%,
+            componente 2 = {{ data.grafica_clusters.varianza[1] }}%.
+        </p>
+    </section>
+
+    <section id="centroides">
+        <h2>Visualizacion de centroides</h2>
+        <p>
+            La siguiente tabla muestra el perfil promedio de cada cluster usando variables
+            faciles de interpretar en la escala original del dataset.
+        </p>
+
+        <table>
+            <tr>
+                <th>Cluster</th>
+                <th>Antiguedad promedio</th>
+                <th>Cargo mensual promedio</th>
+                <th>Cargo total promedio</th>
+                <th>Porcentaje churn</th>
+            </tr>
+            {% for centroide in data.centroides %}
+            <tr>
+                <td>{{ centroide.cluster }}</td>
+                <td>{{ centroide.tenure }}</td>
+                <td>{{ centroide.MonthlyCharges }}</td>
+                <td>{{ centroide.TotalCharges }}</td>
+                <td>{{ centroide.churn_porcentaje }}%</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </section>
+
+    <section id="codo">
+        <h2>Grafica del metodo del codo</h2>
+        <p>
+            El metodo del codo compara la inercia para diferentes valores de K. Se busca un punto
+            donde la reduccion de inercia empieza a ser menos pronunciada.
+        </p>
+
+        <svg class="grafica" viewBox="0 0 800 420" role="img" aria-label="Grafica del metodo del codo">
+            <line x1="60" y1="380" x2="760" y2="380" stroke="#9ca3af" />
+            <line x1="60" y1="40" x2="60" y2="380" stroke="#9ca3af" />
+            <polyline points="{{ data.grafica_codo.polyline }}" fill="none" stroke="#2563eb" stroke-width="3" />
+
+            {% for punto in data.grafica_codo.puntos %}
+                <circle cx="{{ punto.svg_x }}" cy="{{ punto.svg_y }}" r="5" fill="#2563eb" />
+                <text x="{{ punto.svg_x - 5 }}" y="400" font-size="12" fill="#374151">{{ punto.k }}</text>
+                <text x="{{ punto.svg_x + 8 }}" y="{{ punto.svg_y - 8 }}" font-size="11" fill="#374151">{{ punto.inercia }}</text>
+            {% endfor %}
+
+            <text x="380" y="415" font-size="13" fill="#374151">Numero de clusters K</text>
+            <text x="8" y="30" font-size="13" fill="#374151">Inercia</text>
+        </svg>
+    </section>
+
+    <section id="interpretacion">
+        <h2>Interpretacion de resultados</h2>
+        <p>
+            Los clusters permiten comparar perfiles. Un cluster con mayor porcentaje de churn
+            puede necesitar acciones de retencion; uno con mayor antiguedad y cargos altos puede
+            representar clientes valiosos y estables.
+        </p>
+        <ul>
+            {% for item in data.interpretacion %}
+                <li>{{ item.texto }}</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section id="variables">
+        <h2>Explicacion de variables utilizadas para el agrupamiento</h2>
+        <table>
+            <tr>
+                <th>Variable</th>
+                <th>Significado</th>
+                <th>Uso en el agrupamiento</th>
+            </tr>
+            {% for variable in data.variables_usadas %}
+            <tr>
+                <td>{{ variable.variable }}</td>
+                <td>{{ variable.significado }}</td>
+                <td>{{ variable.uso }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </section>
+
+    <section id="resultados">
+        <h2>Resumen de clusters</h2>
+        <table>
+            <tr>
+                <th>Cluster</th>
+                <th>Clientes</th>
+                <th>Antiguedad promedio</th>
+                <th>Cargo mensual promedio</th>
+                <th>Cargo total promedio</th>
+                <th>Churn Yes</th>
+                <th>Churn No</th>
+            </tr>
+
+            {% for cluster in data.resumen_cluster %}
+            <tr>
+                <td>{{ cluster.cluster }}</td>
+                <td>{{ cluster.clientes }}</td>
+                <td>{{ cluster.antiguedad_promedio }}</td>
+                <td>{{ cluster.cargo_mensual_promedio }}</td>
+                <td>{{ cluster.cargo_total_promedio }}</td>
+                <td>{{ cluster.churn_si }}</td>
+                <td>{{ cluster.churn_no }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </section>
+
+    <section id="muestra">
+        <h2>Muestra de clientes agrupados</h2>
+        <table>
+            <tr>
+                <th>ID Cliente</th>
+                <th>Genero</th>
+                <th>Antiguedad</th>
+                <th>Contrato</th>
+                <th>Metodo de pago</th>
+                <th>Cargo mensual</th>
+                <th>Cargo total</th>
+                <th>Churn</th>
+                <th>Cluster</th>
+            </tr>
+
+            {% for cliente in data.resultado %}
+            <tr>
+                <td>{{ cliente.customerID }}</td>
+                <td>{{ cliente.gender }}</td>
+                <td>{{ cliente.tenure }}</td>
+                <td>{{ cliente.Contract }}</td>
+                <td>{{ cliente.PaymentMethod }}</td>
+                <td>{{ cliente.MonthlyCharges }}</td>
+                <td>{{ cliente.TotalCharges }}</td>
+                <td>{{ cliente.Churn }}</td>
+                <td>{{ cliente.cluster }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </section>
+
+</body>
+</html>

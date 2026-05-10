@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisis de Ventas con PySpark</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar" aria-label="Navegacion principal">
+        <a class="brand" href="{{ url_for('home') }}">Proyecto Mineria</a>
+        <div class="nav-links">
+            <a href="{{ url_for('home') }}">Clustering</a>
+            <!-- <a href="{{ url_for('resultadosSpark') }}">Ventas Spark</a> -->
+            <a href="#ciudad">Ciudad</a>
+            <a href="#categoria">Categoria</a>
+            <a href="#tienda">Tienda</a>
+        </div>
+    </nav>
+
+    <header id="inicio">
+        <h1>Analisis de Ventas con PySpark y Flask</h1>
+        <p>
+            Resumen de ventas agrupado por ciudad, categoria y tienda usando datos procesados
+            localmente con PySpark.
+        </p>
+    </header>
+
+    <section id="ciudad">
+        <h2>Ventas por ciudad</h2>
+        <table>
+            <tr>
+                <th>Ciudad</th>
+                <th>Total ventas</th>
+            </tr>
+            {% for item in ventas_ciudad %}
+            <tr>
+                <td>{{ item.ciudad }}</td>
+                <td>${{ "{:,.0f}".format(item.total_ventas) }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </section>
+
+    <section id="categoria">
+        <h2>Ventas por categoria</h2>
+        <table>
+            <tr>
+                <th>Categoria</th>
+                <th>Total ventas</th>
+            </tr>
+            {% for item in ventas_categoria %}
+            <tr>
+                <td>{{ item.categoria }}</td>
+                <td>${{ "{:,.0f}".format(item.total_ventas) }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </section>
+
+    <section id="tienda">
+        <h2>Promedio de ventas por tienda</h2>
+        <table>
+            <tr>
+                <th>Tienda</th>
+                <th>Promedio venta</th>
+            </tr>
+            {% for item in promedio_tienda %}
+            <tr>
+                <td>{{ item.tienda }}</td>
+                <td>${{ "{:,.0f}".format(item.promedio_venta) }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </section>
+
+</body>
+</html>

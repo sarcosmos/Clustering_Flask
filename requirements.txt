@@ -1,0 +1,4 @@
+﻿flask
+pandas
+pyspark
+scikit-learn
